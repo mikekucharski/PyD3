@@ -15,19 +15,19 @@ Sometimes when you move your MP3 file to iTunes or your phone, you will notice t
 
 # How to use
 
-1. Place all of the song files into separate folders. Each folder will represent a CD folder.
+1. Place all of the song files from a particular CD into separate folders. Each folder will represent a CD folder, and each CD folder should only contain songs from that CD (and the album cover of course).
 
 2. Name your MP3 files. The song number and song name are parsed from the mp3 file. The song number must be 2 digits long and there must be a space delimiting the song number from the name. Example: ```<2 digit song number> <song name>.mp3```
 
 2. Name your CD folder. The artist name, album name, and year are parsed from the folder name. The folder name should be in the following format: ```<Artist Name> - <Album Name> (<Year>)```
 
-3. Add an image file names "cover" in the CD folder
+3. Add an image file named "cover" in the CD folder
 
 4. Run the program with ```python tagEditor.py multiple```
 
 5. A dialog box will pop up. Select the directory that contains all of your CD folders. The program will now crawl through this directory and fix the ID3 tag information for all of your MP3 files.
 
-## Example File Layout?
+## Example file Layout?
 
 In this example you would select the folder 'test' and add the "multiple param.
 ```
@@ -44,7 +44,7 @@ test/
 
 ## I only want to edit one CD?
 
-Specify "single" instead of "multiple" when you run the program: ```python tagEditor.py single```
+Specify "single" instead of "multiple" when you run the program: ```python tagEditor.py single``` When you are prompted to select the directory, make sure you select the name of the cd folder. "The Beatles - Abbey Road (1969)/" in the example above, not "test".
 
 
 
