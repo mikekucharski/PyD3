@@ -14,7 +14,7 @@ def log_error(open_file, msg):
 	print(msg)
 
 # define regex schemas for pattern matching cd/song names
-cd_schema = re.compile("^[\w ',()]{1,} - [\w ',()]{1,} \([0-9]{4}\)", re.IGNORECASE)
+cd_schema = re.compile("^[\w ',()]{1,} - [\w ',()+.]{1,} \([0-9]{4}\)", re.IGNORECASE)
 song_schema = re.compile("^[0-9]{2} [\w ',()+.]{1,}.mp3", re.IGNORECASE)
 
 if len(sys.argv) == 3:
@@ -49,7 +49,7 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 		cd_name = cd_path.split('/')[-1]
 		print "Working in " + cd_name
 		if(not cd_schema.match(cd_name) ):
-			log_error(error_log, "Error - Invalid cd name - '{0}' is not a valid folder name. Skipping this folder.".format(cd_name))
+			log_error(error_log, "Error - Invalid cd name => '{0}' is not a valid folder name. Skipping this folder.".format(cd_name))
 			continue
 
 		#capitalize first letter of each word only
@@ -68,14 +68,14 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 		mp3_list = [s for s in glob.glob(cd_path + "/*.mp3")]
 		print "Found " + str(len(mp3_list)) + " mp3 files."
 		if(len(mp3_list) == 0):
-			log_error(error_log, "Error - No mp3 files found in {0}".format(cd_path))
+			log_error(error_log, "Error - No mp3 files found in {0}".format(cd_name))
 
 		for song_path in sorted(mp3_list):
 			song_name = song_path.split('/')[-1]
 			print "Processing >>> {0}".format(song_name)
 
 			if(not song_schema.match(song_name) ):
-				log_error(error_log, "Error - Invalid song name - {0}/{1}. Skipping this song file.".format(cd_name, song_name))
+				log_error(error_log, "Error - Invalid song name => {0}/{1}. Skipping this song file.".format(cd_name, song_name))
 				continue
 
 			#capitalize first letter of each word only
