@@ -49,6 +49,8 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			log_error(error_log, "Error - Invalid cd name - '{0}' is not a valid folder name. Skipping this folder.".format(cd_name))
 			continue
 
+		#capitalize first letter of each word only
+		cd_name = " ".join(w.capitalize() for w in cd_name.split())
 		# extract metadata from directory name
 		artist = cd_name.split('-')[0].strip()
 		album = cd_name.split('-')[1][:-6].strip()
@@ -72,6 +74,9 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			if(not song_schema.match(song_name) ):
 				log_error(error_log, "Error - Invalid song name - {0}/{1}. Skipping this song file.".format(cd_name, song_name))
 				continue
+
+			#capitalize first letter of each word only
+			song_name = " ".join(w.capitalize() for w in song_name.split())
 
 			# extract metadata from song name
 			track_number = song_name[:2].strip()
