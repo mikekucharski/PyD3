@@ -6,31 +6,34 @@ import os
 import sys
 import glob
 import re
+from sys import argv
 
 def log_error(open_file, msg):
 	msg += "\r\n"
 	open_file.write(msg)
 	print(msg)
 
-# we don't want a full GUI, so keep the root window from appearing
-Tk().withdraw()
-
 # define regex schemas for pattern matching cd/song names
 cd_schema = re.compile("^[\w ',()]{1,} - [\w ',()]{1,} \([0-9]{4}\)", re.IGNORECASE)
 song_schema = re.compile("^[0-9]{2} [\w ',()+.]{1,}.mp3", re.IGNORECASE)
 
-# show an "Open" dialog box and return the path to the selected dir
-pathname = tkFileDialog.askdirectory()
+if len(sys.argv) == 3:
+	filename, file_type, pathname = sys.argv
+elif len(sys.argv) == 2:
+	filename, file_type = sys.argv
+	# we don't want a full GUI, so keep the root window from appearing
+	Tk().withdraw()
+	# show an "Open" dialog box and return the path to the selected dir
+	pathname = tkFileDialog.askdirectory()
+else:
+	print "Error - Invalid number of parameters. Exiting script."
+	sys.exit()
 
 if not isinstance(pathname, str) or not os.path.isdir(pathname):
-	print "Error - you must select a directory"
+	print "Error - file path not valid. Exiting Script."
 	sys.exit()
 
-if(len(sys.argv) < 2):
-	print "Error - You did not provide the type. Type can be \'single\' or \'multiple\'"
-	sys.exit()
-
-file_type = sys.argv[1].lower()
+file_type = file_type.lower()
 if file_type == 'single':
 	dir_list = [pathname]
 elif file_type == 'multiple':
