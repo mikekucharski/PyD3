@@ -5,7 +5,7 @@ A command line tool for editing ID3 tags of MP3 files. This tool will strip any 
 
 ## Why edit my ID3 tags?
 
-Sometimes when you move your MP3 file to iTunes or your phone, you will notice that the meta data (album artwork, aritst, track title, etc) is incorrect. Sometimes a blogs website link will show up under the lyrics section. This is very annoying and because of the fact that the underlying ID3 tag contains unwanted data. Use this tool to cleanse your files.
+Sometimes when you move your MP3 file to iTunes or your phone, you will notice that the meta data (album artwork, aritst, track title, etc) is incorrect. Sometimes a blog's website link will show up under the lyrics section. This happens because the underlying ID3 tag contains unwanted data. Use this tool to cleanse your files!
 
 ## Install Instructions
 
