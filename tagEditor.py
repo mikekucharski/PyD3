@@ -26,9 +26,13 @@ elif len(sys.argv) == 2:
 	# show an "Open" dialog box and return the path to the selected dir
 	pathname = tkFileDialog.askdirectory()
 else:
-	print "Error - Invalid number of parameters. Exiting script."
+	print "Error - Invalid number of parameters. Script must have <filename> <file_type> (<pathname>) format. Exiting script."
 	sys.exit()
 
+# for some reason windows grabs the path as unicode
+if isinstance(pathname, unicode):
+	pathname = pathname.encode('ascii','ignore')
+	
 if not isinstance(pathname, str) or not os.path.isdir(pathname):
 	print "Error - file path not valid. Exiting Script."
 	sys.exit()
@@ -46,6 +50,10 @@ print "Found {0} directories.".format(len(dir_list))
 with open(pathname+"/error_log.txt", "wb") as error_log:
 	log_error(error_log, "========== Error Log =========")
 	for cd_path in sorted(dir_list):
+	
+		# convert cd path to unix forward slashes
+		cd_path = cd_path.replace('\\','/')
+		cd_path = cd_path.replace('\\\\','/')
 		cd_name = cd_path.split('/')[-1]
 		print "Working in " + cd_name
 		if(not cd_schema.match(cd_name) ):
@@ -71,6 +79,10 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			log_error(error_log, "Error - No mp3 files found in {0}".format(cd_name))
 
 		for song_path in sorted(mp3_list):
+			# convert cd path to unix forward slashes
+			song_path = song_path.replace('\\','/')
+			song_path = song_path.replace('\\\\','/')
+			
 			song_name = song_path.split('/')[-1]
 			print "Processing >>> {0}".format(song_name)
 
@@ -96,17 +108,28 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 				image_path = all_images[0]    # grab the first image we found
 				image_type = image_path.split('.')[-1]  # get the file extension
 
-			# all good,
+
+			#song_path = song_path.replace('/', '\\')
+
 			try:
 				audio = ID3(song_path)
 			except: 
 				print "Adding ID3 header",
 				audio = ID3()
+				audio.add(TPE1(encoding=3, text=u'Artist'))
+				audio.save(song_path, v2_version=3)
 			audio.load(song_path)
 			
 			#print audio.pprint()  # debugging purposes
 			#audio.clear()
-			audio.delete()
+			
+			# if an ID3 tag still can't be found, skip trying to delete it
+			try:
+				audio.delete()
+				audio.save(song_path, v2_version=3)
+			except:
+				print "Missing ID3 Tag"
+				
 			audio.add(TIT2(encoding=3, text=unicode(track_name) ))         # TITLE
 			audio.add(TRCK(encoding=3, text=unicode(int(track_number)) ))  # TRACK
 			audio.add(TPE1(encoding=3, text=unicode(artist) ))             # ARTIST
