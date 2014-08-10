@@ -14,8 +14,8 @@ def log_error(open_file, msg):
 	print(msg)
 
 # define regex schemas for pattern matching cd/song names
-cd_schema = re.compile("^[\w ',()]{1,} - [\w ',()+.-]{1,} \([0-9]{4}\)", re.IGNORECASE)
-song_schema = re.compile("^[0-9]{2} [\w ',()+.-]{1,}.mp3", re.IGNORECASE)
+cd_schema = re.compile("^[\w ',()]{1,} - [\w ;',()+.-]{1,} \([0-9]{4}\)", re.IGNORECASE)
+song_schema = re.compile("^[0-9]{2} [\w ;',()+.-]{1,}.mp3", re.IGNORECASE)
 
 if len(sys.argv) == 3:
 	filename, file_type, pathname = sys.argv
@@ -36,6 +36,8 @@ if isinstance(pathname, unicode):
 if not isinstance(pathname, str) or not os.path.isdir(pathname):
 	print "Error - file path not valid. Exiting Script."
 	sys.exit()
+
+pathname = pathname.rstrip('/');
 
 file_type = file_type.lower()
 if file_type == 'single':
