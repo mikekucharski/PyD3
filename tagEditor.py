@@ -1,7 +1,7 @@
 from Tkinter import Tk
 from tkFileDialog import askopenfilename
 import tkFileDialog
-from mutagen.id3 import ID3, TIT2, TALB, TPE1, TPE2, COMM, USLT, TCOM, TCON, TDRC, TRCK, APIC, error
+from mutagen.id3 import ID3, TIT2, TALB, TPE1, TPE2, COMM, USLT, TCOM, TCON, TDRC, TRCK, APIC, error, TYER
 import os
 import sys
 import glob
@@ -137,8 +137,9 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			audio.add(TPE1(encoding=3, text=unicode(artist) ))             # ARTIST
 			audio.add(TPE2(encoding=3, text=unicode(artist) ))             # ALBUMARTIST
 			audio.add(TALB(encoding=3, text=unicode(album) ))              # ALBUM
-			audio.add(TDRC(encoding=3, text=unicode(int(year)) ))          # YEAR
-			audio.add(TCON(encoding=3, text=unicode("Deathcore") ))        # GENRE
+			audio.add(TYER(encoding=3, text=unicode(year) ))               # YEAR
+			audio.add(TDRC(encoding=3, text=unicode(year) ))               # YEAR
+			audio.add(TCON(encoding=3, text=unicode("Metal") ))            # GENRE
 
 			if(image_found):
 				image_data = open(image_path, 'rb').read()
