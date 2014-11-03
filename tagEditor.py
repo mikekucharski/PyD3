@@ -1,56 +1,56 @@
-from Tkinter import Tk
-from tkFileDialog import askopenfilename
-import tkFileDialog
 from mutagen.id3 import ID3, TIT2, TALB, TPE1, TPE2, COMM, USLT, TCOM, TCON, TDRC, TRCK, APIC, error, TYER
 import os
 import sys
 import glob
 import re
-from sys import argv
+import argparse
 
-def log_error(open_file, msg):
+def log(open_file, msg, tag=False):
+	if tag:
+		msg = tag + msg
 	msg += "\r\n"
 	open_file.write(msg)
 	print(msg)
+
+ERROR_TAG = "[Error] "
+WARNING_TAG = "[Warning] "
 
 # define regex schemas for pattern matching cd/song names
 cd_schema = re.compile("^[\w ',()]{1,} - [\w ;',()+.-]{1,} \([0-9]{4}\)", re.IGNORECASE)
 song_schema = re.compile("^[0-9]{2} [\w ;',()+.-]{1,}.mp3", re.IGNORECASE)
 
-if len(sys.argv) == 3:
-	filename, file_type, pathname = sys.argv
-elif len(sys.argv) == 2:
-	filename, file_type = sys.argv
-	# we don't want a full GUI, so keep the root window from appearing
-	Tk().withdraw()
-	# show an "Open" dialog box and return the path to the selected dir
-	pathname = tkFileDialog.askdirectory()
-else:
-	print "Error - Invalid number of parameters. Script must have <filename> <file_type> (<pathname>) format. Exiting script."
-	sys.exit()
+parser = argparse.ArgumentParser(description='PyD3 is a tool used to organize mp3 file metadata')
+parser.add_argument('-p', metavar='pathname', help='Specify a path that contains album directories.', required=True)
+parser.add_argument('-g', metavar='genre', help='The genre of music for this batch')
+args = vars(parser.parse_args())
+
+parent_dir = args['p']
+genre = args['g'] if args['g'] is not None else 'Metal'
 
 # for some reason windows grabs the path as unicode
-if isinstance(pathname, unicode):
-	pathname = pathname.encode('ascii','ignore')
+if isinstance(parent_dir, unicode):
+	parent_dir = parent_dir.encode('ascii','ignore')
 	
-if not isinstance(pathname, str) or not os.path.isdir(pathname):
-	print "Error - file path not valid. Exiting Script."
+if not isinstance(parent_dir, str) or not os.path.isdir(parent_dir):
+	print "[Error] Exiting script because folder {0} could not be found.".format(parent_dir)
 	sys.exit()
 
-pathname = pathname.rstrip('/');
+parent_dir = parent_dir.rstrip('/');
 
-file_type = file_type.lower()
-if file_type == 'single':
-	dir_list = [pathname]
-elif file_type == 'multiple':
-	dir_list = [d for d in glob.glob(pathname + "/*") if os.path.isdir(d)]
-else:
-	print "Error - Invalid type. Type can be \'single\' or \'multiple\'"
-	sys.exit()
-print "Found {0} directories.".format(len(dir_list))
+#grab paths of all folders
+dir_list = [d for d in glob.glob(parent_dir + "/*") if os.path.isdir(d)]
 
-with open(pathname+"/error_log.txt", "wb") as error_log:
-	log_error(error_log, "========== Error Log =========")
+with open(parent_dir+"/error_log.txt", "wb") as error_log:
+	log(error_log, "========== Error Log =========")
+
+	# Skip folders that do not match the cd schema
+	for d in dir_list:
+		cd_name = d.split('/')[-1]
+		if not cd_schema.match(cd_name):
+			log(error_log, "Skipping '{0}' because it is not a valid album directory name.".format(cd_name), WARNING_TAG)
+			dir_list.remove(d)
+	print "Found {0} album directories.".format(len(dir_list))
+
 	for cd_path in sorted(dir_list):
 	
 		# convert cd path to unix forward slashes
@@ -58,9 +58,6 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 		cd_path = cd_path.replace('\\\\','/')
 		cd_name = cd_path.split('/')[-1]
 		print "Working in " + cd_name
-		if(not cd_schema.match(cd_name) ):
-			log_error(error_log, "Error - Invalid cd name => '{0}' is not a valid folder name. Skipping this folder.".format(cd_name))
-			continue
 
 		#capitalize first letter of each word only
 		cd_name = " ".join(w.capitalize() for w in cd_name.split())
@@ -78,7 +75,7 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 		mp3_list = [s for s in glob.glob(cd_path + "/*.mp3")]
 		print "Found " + str(len(mp3_list)) + " mp3 files."
 		if(len(mp3_list) == 0):
-			log_error(error_log, "Error - No mp3 files found in {0}".format(cd_name))
+			log(error_log, "No mp3 files found in '{0}'".format(cd_name), WARNING_TAG)
 
 		for song_path in sorted(mp3_list):
 			# convert cd path to unix forward slashes
@@ -89,7 +86,7 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			print "Processing >>> {0}".format(song_name)
 
 			if(not song_schema.match(song_name) ):
-				log_error(error_log, "Error - Invalid song name => {0}/{1}. Skipping this song file.".format(cd_name, song_name))
+				log(error_log, "Skipping mp3, unable to parse filename '{0}/{1}'".format(cd_name, song_name), ERROR_TAG)
 				continue
 
 			#capitalize first letter of each word only
@@ -139,13 +136,13 @@ with open(pathname+"/error_log.txt", "wb") as error_log:
 			audio.add(TALB(encoding=3, text=unicode(album) ))              # ALBUM
 			audio.add(TYER(encoding=3, text=unicode(year) ))               # YEAR
 			audio.add(TDRC(encoding=3, text=unicode(year) ))               # YEAR
-			audio.add(TCON(encoding=3, text=unicode("Metal") ))            # GENRE
+			audio.add(TCON(encoding=3, text=unicode(genre) ))              # GENRE
 
 			if(image_found):
 				image_data = open(image_path, 'rb').read()
 				audio.add(APIC(3, "image/"+image_type, 3, 'Album Cover', image_data))  # Album Artwork
 			else:
-				log_error(error_log, "Error - Cover not found - Did not find an image named cover in {0}".format(cd_path))
+				log(error_log, "Did not find an image named 'cover' in \"{0}\"".format(cd_name), ERROR_TAG)
 			audio.save(song_path, v2_version=3)
 
 			# USED FOR DEBUGGING
