@@ -43,4 +43,6 @@ exampleDirectory/
 Run ```python tagEditor.py -p {path}/exampleDirectory -g Rock```
 
 
+## Run on a single album directory with -s
 
+Run ```python tagEditor.py -s -p {path to album directory} -g Rock```
