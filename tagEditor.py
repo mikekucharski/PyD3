@@ -20,27 +20,36 @@ cd_schema = re.compile("^[\w ',()]{1,} - [\w ;',()+.-]{1,} \([0-9]{4}\)", re.IGN
 song_schema = re.compile("^[0-9]{2} [\w ;',()+.-]{1,}.mp3", re.IGNORECASE)
 
 parser = argparse.ArgumentParser(description='PyD3 is a tool used to organize mp3 file metadata')
-parser.add_argument('-p', metavar='pathname', help='Specify a path that contains album directories.', required=True)
+parser.add_argument('-p', metavar='pathname', help='Specify a path that contains album directories', required=True)
 parser.add_argument('-g', metavar='genre', help='The genre of music for this batch')
+parser.add_argument('-s', help='Flag to execute command on single album directory', action='store_true')
 args = vars(parser.parse_args())
 
-parent_dir = args['p']
+# parse args
+pathname = args['p']
 genre = args['g'] if args['g'] is not None else 'Metal'
+singleAlbum = args['s']
 
 # for some reason windows grabs the path as unicode
-if isinstance(parent_dir, unicode):
-	parent_dir = parent_dir.encode('ascii','ignore')
+if isinstance(pathname, unicode):
+	pathname = pathname.encode('ascii','ignore')
 	
-if not isinstance(parent_dir, str) or not os.path.isdir(parent_dir):
-	print "[Error] Exiting script because folder {0} could not be found.".format(parent_dir)
+if not isinstance(pathname, str) or not os.path.isdir(pathname):
+	print "[Error] Exiting script because '{0}' is not a directory.".format(pathname)
 	sys.exit()
 
-parent_dir = parent_dir.rstrip('/');
+pathname = pathname.rstrip('/');
 
-#grab paths of all folders
-dir_list = [d for d in glob.glob(parent_dir + "/*") if os.path.isdir(d)]
+if(singleAlbum):
+	dir_list = [pathname]
+else:
+	# grab paths of all folders
+	dir_list = [d for d in glob.glob(pathname + "/*") if os.path.isdir(d)]
 
-with open(parent_dir+"/error_log.txt", "wb") as error_log:
+# set up log path. go back a directory if album directory given
+logPath = pathname+"/.." if singleAlbum else pathname
+
+with open(logPath+"/error_log.txt", "wb") as error_log:
 	log(error_log, "========== Error Log =========")
 
 	# Skip folders that do not match the cd schema
@@ -59,7 +68,7 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 		cd_name = cd_path.split('/')[-1]
 		print "Working in " + cd_name
 
-		#capitalize first letter of each word only
+		# capitalize first letter of each word only
 		cd_name = " ".join(w.capitalize() for w in cd_name.split())
 		# extract metadata from directory name
 		artist = cd_name.split('-')[0].strip()
@@ -73,7 +82,7 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 			os.remove(hiddenFile)
 
 		mp3_list = [s for s in glob.glob(cd_path + "/*.mp3")]
-		print "Found " + str(len(mp3_list)) + " mp3 files."
+		print "Found " + str(len(mp3_list)) + " mp3 files"
 		if(len(mp3_list) == 0):
 			log(error_log, "No mp3 files found in '{0}'".format(cd_name), WARNING_TAG)
 
@@ -89,7 +98,7 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 				log(error_log, "Skipping mp3, unable to parse filename '{0}/{1}'".format(cd_name, song_name), ERROR_TAG)
 				continue
 
-			#capitalize first letter of each word only
+			# capitalize first letter of each word only
 			song_name = " ".join(w.capitalize() for w in song_name.split())
 
 			# extract metadata from song name
@@ -108,7 +117,7 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 				image_type = image_path.split('.')[-1]  # get the file extension
 
 
-			#song_path = song_path.replace('/', '\\')
+			# song_path = song_path.replace('/', '\\')
 
 			try:
 				audio = ID3(song_path)
@@ -119,8 +128,9 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 				audio.save(song_path, v2_version=3)
 			audio.load(song_path)
 			
-			#print audio.pprint()  # debugging purposes
-			#audio.clear()
+			# USED FOR DEBUGGING
+			# print audio.pprint()
+			# audio.clear()
 			
 			# if an ID3 tag still can't be found, skip trying to delete it
 			try:
@@ -150,4 +160,4 @@ with open(parent_dir+"/error_log.txt", "wb") as error_log:
 			# print audio.pprint()
 			# sys.exit()
 		print " " # newline
-print "Done."
+	log(error_log, "Done")
