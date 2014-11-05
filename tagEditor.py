@@ -16,8 +16,8 @@ ERROR_TAG = "[Error] "
 WARNING_TAG = "[Warning] "
 
 # define regex schemas for pattern matching cd/song names
-cd_schema = re.compile("^[\w ',()]{1,} - [\w ;',()+.-]{1,} \([0-9]{4}\)", re.IGNORECASE)
-song_schema = re.compile("^[0-9]{2} [\w ;',()+.-]{1,}.mp3", re.IGNORECASE)
+cd_schema = re.compile("^.+ - .+ \([0-9]{4}\)", re.IGNORECASE)
+song_schema = re.compile("^[0-9]{2} .+\.mp3", re.IGNORECASE)
 
 parser = argparse.ArgumentParser(description='PyD3 is a tool used to organize mp3 file metadata')
 parser.add_argument('-p', metavar='pathname', help='Specify a path that contains album directories', required=True)
@@ -70,10 +70,13 @@ with open(logPath+"/error_log.txt", "wb") as error_log:
 
 		# capitalize first letter of each word only
 		cd_name = " ".join(w.capitalize() for w in cd_name.split())
+
 		# extract metadata from directory name
-		artist = cd_name.split('-')[0].strip()
-		album = cd_name.split('-')[1][:-6].strip()
-		year = cd_name.split('(')[1][:-1].strip()
+		endOfArtist = cd_name.find(" - ")
+		endOfAlbum = cd_name.rfind('(')
+		artist = cd_name[:endOfArtist].strip()
+		album = cd_name[endOfArtist + 3 : endOfAlbum].strip()
+		year = cd_name[endOfAlbum+1:-1].strip()
 
 		# remove windows media player hidden files
 		windowsMediaHiddenFiles = glob.glob(cd_path + "/AlbumArt*.jpg") + glob.glob(cd_path + "/Folder.jpg") + glob.glob(cd_path + "/desktop.ini")
