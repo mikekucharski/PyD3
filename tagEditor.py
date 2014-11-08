@@ -50,7 +50,7 @@ else:
 logPath = pathname+"/.." if singleAlbum else pathname
 
 with open(logPath+"/error_log.txt", "wb") as error_log:
-	log(error_log, "========== Error Log =========")
+	error_log.write("========== Error Log =========\r\n")
 
 	# Skip folders that do not match the cd schema
 	for d in dir_list:
