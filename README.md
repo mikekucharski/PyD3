@@ -7,12 +7,16 @@ A command line tool for editing the ID3 tags of MP3 files. This tool will strip 
 
 If you're picky about the metadata in your mp3 files then this is the tool for you. It can be extremely annoying dealing with songs that show up in your phone with the wrong title, year, or genre. Using a batch formatter like PyD3 will help organize your files to make sure they get displayed on your devices exactly how you'd expect.
 
-## Set-up instructions
+## Install Instructions (Windows)
 
-1. Install Python if its not already installed ```sudo apt-get install python```
-2. Finally, clone this repo. Thats it!
+1. Install [Python](https://www.python.org/downloads/). (This install should come with python's package manager pip)
+2. Add python and pip install locations to your Windows PATH environment variable. Assuming you installed python v2.7 to your C drive, you can append the following to your PATH ```;C:\Python27;C:\Python27\Scripts```
+3. Open windows cmd prompt and run ```python --version``` and ```pip --version``` to make sure you have python and pip correctly installed on your machine.
+4. Upgrade your pip version with ```python -m pip install -U pip```
+5. Install **mutagen** dependency using pip with ```pip install mutagen```
+6. Clone/Download this repository to your local machine
 
-# How to use
+## How to use
 
 1. Create a folder to hold all of your album fodlers. The full path of this directory will be given when you run the script. Place all album folders inside this directory.
 
@@ -29,7 +33,7 @@ If you're picky about the metadata in your mp3 files then this is the tool for y
 ## An example with file layout
 
 ```
-exampleDirectory/
+music/
   The Beatles - Abbey Road (1969)/
 	 01 Come Together.mp3
 	 02 Something.mp3
@@ -40,9 +44,9 @@ exampleDirectory/
      cover.png
 ```
 
-Run ```python tagEditor.py -p {path}/exampleDirectory -g Rock```
+Run ```python tagEditor.py -p <path to music>/music -g Rock```
 
 
 ## Run on a single album directory with -s
 
-Run ```python tagEditor.py -s -p {path to album directory} -g Rock```
+Run ```python tagEditor.py -s -p <path to album directory> -g Rock```
