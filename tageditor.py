@@ -1,4 +1,4 @@
-from mutagen.id3 import ID3, TIT2, TALB, TPE1, TPE2, COMM, USLT, TCOM, TCON, TDRC, TRCK, APIC, error, TYER
+from mutagen.id3 import ID3, TIT2, TALB, TPE1, TPE2, COMM, USLT, TCOM, TCON, TDRC, TRCK, APIC, TYER, error, ID3NoHeaderError
 import os
 import sys
 import glob
@@ -25,7 +25,8 @@ def music_title(text):
             word = word.capitalize()
         words[i] = word
     
-    text = " ".join(words);
+    text = " ".join(words)
+    text.replace("_", ":")
 
     # Search for text inside parens and recursively call music_title
     g = re.search('(.*)\((.*)\)(.*)', text, re.IGNORECASE)
@@ -57,64 +58,67 @@ def remove_wmp_files(dir):
 def rename_files(dir_list):
     logger.info("Starting rename process")
     for album_path in sorted(dir_list):
-        album_dir = album_path.split('/')[-1]
-        songs = glob.glob(album_path + "/*.mp3")
-        if len(songs) <= 0:
+        album_dir = os.path.basename(album_path)
+        logger.info("Working in '{0}'".format(album_dir))
+        print album_path + "/*.mp3"
+        mp3_list = glob.glob(album_path + "/*.mp3")
+        if len(mp3_list) <= 0:
             logger.warn("No mp3 files found. Skipping rename process for '{0}'".format(album_dir))
             continue
 
         if REGEX_ALBUM_DIR.match(album_dir):
             logger.info("GOOD - Album name format matches. Skipping rename for '{0}'".format(album_dir))
-            os.rename(album_path, os.path.join(os.path.dirname(album_path), album_dir.title()))
-        else:
-            try: # rename album directory
-                audio = ID3(songs[0])
-                artist, album, year = unicode(audio["TPE1"].text[0]), unicode(audio["TALB"].text[0]), unicode(audio["TDRC"].text[0])
-                artist = music_title(artist.strip())
-                album = music_title(album.strip())
-                year = year.strip()
+        else:  # rename album directory
+            try:
+                tag = ID3(mp3_list[0])
+                # TYER checks the year from the IDv1 frame
+                tag_list = tag.get("TPE1"), tag.get("TALB"), (tag.get('TYER') or tag.get('TDRC'))
+                if not all(tag_list):
+                    logger.warn("Could not find artist, album, and year when parsing first song")
+                    continue
 
-                if year == None or year == "":
-                    year = unicode(audio["TYER"].text).strip()  # check the IDv1 frame
-                match = re.search(r'\d{4}', year)
-                year = match.group() if match else None
+                artist = music_title(tag_list[0].text[0])
+                album = music_title(tag_list[1].text[0])
+                year = tag_list[2].text[0]
+
+                if year.__class__.__name__ == "ID3TimeStamp":
+                    year = year.text[:4] # format YYYY-MM-DD
+
                 new_album_dir = "{0} - {1} ({2})".format(artist, album, year)
                 new_album_path = os.path.join(os.path.dirname(album_path), new_album_dir)
 
-                logger.info("RENAME - Renaming album directory from '{0}' to '{1}'".format(album_path.split("/")[-1], new_album_dir))
+                logger.info("Renaming album directory from '{0}' to '{1}'".format(album_dir, new_album_dir))
                 os.rename(album_path, new_album_path)
                 album_path = new_album_path
-            except:
-                logger.warn("Exception thrown when parsing first mp3 file to rename album dir for '{0}'".format(album_path))
+            except ID3NoHeaderError:
+                logger.warn("Exception thrown when parsing first mp3 file to rename album dir for '{0}'".format(album_dir))
 
-        songs = glob.glob(album_path + "/*.mp3") # get a new song list since the file names have changed
-        for song in songs: # rename songs
+        # Rename mp3 files
+        mp3_list = glob.glob(album_path + "/*.mp3") # get a new song list since the file names have changed
+        for song_path in sorted(mp3_list):
+            filename = os.path.basename(song_path)
             # skip renaming if already in correct format
-            filename = song.split('/')[-1]
             if REGEX_FILENAME.match(filename):
                 logger.info("GOOD - Song format matches. Skipping rename for '{0}'".format(filename))
-                new_song_path = os.path.join(os.path.dirname(song), music_title_mp3(filename))
-                os.rename(song, new_song_path)
                 continue
 
             try:
-                audio = ID3(song)
-                track, title = unicode(audio["TRCK"].text[0]), unicode(audio["TIT2"].text[0])
+                tag = ID3(song)
+                tag_list = tag.get("TRCK"), tag.get("TIT2")
+                if not all(tag_list):
+                    logger.warn("Could not find track number and name when parsing '{0}'".format(filename))
+                    continue
+                track, title = tag_list[0].text[0], music_title(tag_list[1].text[0])
+                # covers when track format is 1/1. Also left pads with 0's up to 2 characters
+                track = track.split('/')[0].zfill(2)
 
-                title = title.title()
-                index = track.find('/') # cover cases where track is "1/1"
-                if index != -1:
-                    track = track[:index] # take everything up to the index found
-
-                track_num = int(track)
-                track = "0" + str(track_num) if track_num < 10 else track_num
                 new_filename = "{0} {1}.mp3".format(track, title)
-                new_song_path = os.path.join(os.path.dirname(song), new_filename)
+                new_song_path = os.path.join(os.path.dirname(song_path), new_filename)
 
-                logger.info("RENAME - Renaming song to '{0}' from '{1}'".format(new_filename, filename))
+                logger.info("Renaming song from '{0}' to '{1}'".format(filename, new_filename))
                 os.rename(song, new_song_path)
             except:
-                logger.warn("Exception thrown when parsing '{0}'".format(song))
+                logger.warn("Exception thrown when parsing '{0}'".format(filename))
                 continue
     logger.info("Finished renaming process")
 
@@ -154,7 +158,7 @@ def save_metadata(dir_list, genre):
             filename = os.path.basename(song_path)
             logger.info("Processing >>> {0}".format(filename))
             if not REGEX_FILENAME.match(filename):
-                logger.error("Skipping mp3 invalid filename format '{0}/{1}'".format(album_dir, filename))
+                logger.warn("Skipping mp3 invalid filename format '{0}/{1}'".format(album_dir, filename))
                 continue
 
             # extract metadata from song name
@@ -163,39 +167,32 @@ def save_metadata(dir_list, genre):
             track_num, track_name = track_params.group(1).strip(), music_title(track_params.group(3).strip())
 
             try:
-                audio = ID3(song_path)
-            except: 
-                logger.info("Adding ID3 header")
-                audio = ID3()
-                audio.add(TPE1(encoding=3, text=u'Artist'))
-                audio.save(song_path, v2_version=3)
-            audio.load(song_path)
+                # If  genre not provided, take from existing tag
+                if genre is None:
+                    tag = ID3(song_path) # will call load() on the path
+                    genre = tag.get("TCON").genres[0] if tag.get("TCON") else ""
+                    genre = "Metal" if genre is None or genre.strip() == "" else genre
+            except ID3NoHeaderError:
+                logger.warn("File does not start with an ID3 tag")
             
-            # USED FOR DEBUGGING
-            # print audio.pprint()
-            # audio.clear()
-            
-            # if an ID3 tag still can't be found, skip trying to delete it
-            try:
-                audio.delete()
-                audio.save(song_path, v2_version=3)
-            except:
-                logger.info("Missing ID3 Tag")
-                
-            audio.add(TIT2(encoding=3, text=unicode(track_name) ))         # TITLE
-            audio.add(TRCK(encoding=3, text=unicode(int(track_num)) ))  # TRACK
-            audio.add(TPE1(encoding=3, text=unicode(artist) ))             # ARTIST
-            audio.add(TPE2(encoding=3, text=unicode(artist) ))             # ALBUMARTIST
-            audio.add(TALB(encoding=3, text=unicode(album) ))              # ALBUM
-            audio.add(TYER(encoding=3, text=unicode(year) ))               # YEAR
-            audio.add(TDRC(encoding=3, text=unicode(year) ))               # YEAR
-            audio.add(TCON(encoding=3, text=unicode(genre) ))              # GENRE
+            # Create empty tag and add frames to it
+            tag = ID3()
+            tag.add(TIT2(encoding=3, text=unicode(track_name) ))         # TITLE
+            tag.add(TRCK(encoding=3, text=unicode(int(track_num))))      # TRACK
+            tag.add(TPE1(encoding=3, text=unicode(artist) ))             # ARTIST
+            tag.add(TPE2(encoding=3, text=unicode(artist) ))             # ALBUMARTIST
+            tag.add(TALB(encoding=3, text=unicode(album) ))              # ALBUM
+            tag.add(TYER(encoding=3, text=unicode(year) ))               # YEAR
+            tag.add(TDRC(encoding=3, text=unicode(year) ))               # YEAR
+            tag.add(TCON(encoding=3, text=unicode(genre) ))              # GENRE
 
             if all_images:
                 image_data = open(image_path, 'rb').read()
-                audio.add(APIC(3, "image/"+image_type, 3, 'Album Cover', image_data))  # Album Artwork
+                tag.add(APIC(3, "image/"+image_type, 3, 'Album Cover', image_data))  # Album Artwork
 
-            audio.save(song_path, v2_version=3)
+            tag.save(song_path, v2_version=3) # write the tag as ID3v2.3
+            
+            # Rename file
             new_song_path = os.path.join(os.path.dirname(song_path), filename)
             os.rename(song_path, new_song_path)
 
@@ -219,7 +216,6 @@ def main():
         logger.error("Exiting script because '{0}' is not a directory".format(path))
         sys.exit()
 
-    genre = genre if genre is not None else 'Metal'
     path = path.rstrip('/'); # removes all trailing slashes
     dir_list = [path] if singleAlbumFlag else [d for d in glob.glob(path + "/*") if os.path.isdir(d)] # grab paths of all folders
 
@@ -235,9 +231,9 @@ if __name__ == '__main__':
     # GLOBAL VARIABLES
     # constants
     LOG_DIR = 'log'
-    LOG_FILE_NAME = 'pyd3_' + time.strftime('%Y_%m_%d') + '.log'
+    LOG_FILE_NAME = 'pyd3_' + time.strftime('%Y-%m-%d_%H-%M-%S') + '.log'
     REGEX_ALBUM_DIR = re.compile("^(.+) - (.+) \(([0-9]{4})\)$", re.IGNORECASE)
-    REGEX_FILENAME = re.compile("^([0-9]{2}) ([-_] )?(.+)\.mp3$", re.IGNORECASE)
+    REGEX_FILENAME = re.compile("^([0-9]{2})\.? ([-_] )?(.+)\.mp3$", re.IGNORECASE)
 
     # set up Logger
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s] %(message)s", datefmt='%Y-%m-%d %H:%M:%S')
