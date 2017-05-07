@@ -8,11 +8,18 @@ import fnmatch
 import logging
 import time
 
-def music_title_mp3(filename):
-    return music_title(filename[:-4]) + ".mp3"
-
-# turns "01 example song" into "01 Example Song"
 def music_title(text):
+    """Converts a string into a "title"
+
+    Handles uppercasing only the first leter of words.
+    Keywords such as EP and LP as well as reoman numeralse are caps
+
+    Args:
+        text: The string to 'titlize'
+
+    Returns:
+        The transformed text
+    """
     words = text.split()
     for i, word in enumerate(words):
         romanNumList = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
@@ -25,8 +32,7 @@ def music_title(text):
             word = word.capitalize()
         words[i] = word
     
-    text = " ".join(words)
-    text.replace("_", ":")
+    text = " ".join(words).replace("_", ":")
 
     # Search for text inside parens and recursively call music_title
     g = re.search('(.*)\((.*)\)(.*)', text, re.IGNORECASE)
@@ -34,19 +40,32 @@ def music_title(text):
         text = "{0}({1}){2}".format(g.group(1), music_title(g.group(2)), g.group(3))
     return text
 
-def find_case_insensitve(dirname, extensions):
+def find_files_by_extension(directory, extensions):
+    """Walks through files in a directory and searches for files by extension ignoring case
+
+    Args:
+        directory: The root directory to start the search from
+        extensions: A list of extensions to filter files by
+
+    Returns:
+        An array of filenames that match the extensions argument
+    """
     files = []
-    for filename in glob.glob(dirname):
+    for filename in glob.glob(directory):
         base, ext = os.path.splitext(filename)
         if ext.lower() in extensions:
             files.append(filename)
     return files
 
-# remove windows media player hidden files
-def remove_wmp_files(dir):
+def remove_wmp_files(directory):
+    """Removes windows media player hidden files
+
+    Args:
+        directory: The root directory to start the search from
+    """
     logger.info("Starting purge of WMP image files")
     count = 0
-    for root, dirnames, filenames in os.walk(dir):
+    for root, dirnames, filenames in os.walk(directory):
         for pattern in ('AlbumArt*.jpg', 'Folder.jpg', 'desktop.ini'):
             for filename in fnmatch.filter(filenames, pattern):
                 count += 1
@@ -54,78 +73,10 @@ def remove_wmp_files(dir):
                 os.remove(os.path.join(root, filename))
     logger.info("Finished purge of WMP image files, {0} deleted".format(count))
 
-# walks through dir_list and renames each directory as well as all mp3 files found in that directory
-def rename_files(dir_list):
-    logger.info("Starting rename process")
-    for album_path in sorted(dir_list):
-        album_dir = os.path.basename(album_path)
-        logger.info("Working in '{0}'".format(album_dir))
-        print album_path + "/*.mp3"
-        mp3_list = glob.glob(album_path + "/*.mp3")
-        if len(mp3_list) <= 0:
-            logger.warn("No mp3 files found. Skipping rename process for '{0}'".format(album_dir))
-            continue
-
-        if REGEX_ALBUM_DIR.match(album_dir):
-            logger.info("GOOD - Album name format matches. Skipping rename for '{0}'".format(album_dir))
-        else:  # rename album directory
-            try:
-                tag = ID3(mp3_list[0])
-                # TYER checks the year from the IDv1 frame
-                tag_list = tag.get("TPE1"), tag.get("TALB"), (tag.get('TYER') or tag.get('TDRC'))
-                if not all(tag_list):
-                    logger.warn("Could not find artist, album, and year when parsing first song")
-                    continue
-
-                artist = music_title(tag_list[0].text[0])
-                album = music_title(tag_list[1].text[0])
-                year = tag_list[2].text[0]
-
-                if year.__class__.__name__ == "ID3TimeStamp":
-                    year = year.text[:4] # format YYYY-MM-DD
-
-                new_album_dir = "{0} - {1} ({2})".format(artist, album, year)
-                new_album_path = os.path.join(os.path.dirname(album_path), new_album_dir)
-
-                logger.info("Renaming album directory from '{0}' to '{1}'".format(album_dir, new_album_dir))
-                os.rename(album_path, new_album_path)
-                album_path = new_album_path
-            except ID3NoHeaderError:
-                logger.warn("Exception thrown when parsing first mp3 file to rename album dir for '{0}'".format(album_dir))
-
-        # Rename mp3 files
-        mp3_list = glob.glob(album_path + "/*.mp3") # get a new song list since the file names have changed
-        for song_path in sorted(mp3_list):
-            filename = os.path.basename(song_path)
-            # skip renaming if already in correct format
-            if REGEX_FILENAME.match(filename):
-                logger.info("GOOD - Song format matches. Skipping rename for '{0}'".format(filename))
-                continue
-
-            try:
-                tag = ID3(song)
-                tag_list = tag.get("TRCK"), tag.get("TIT2")
-                if not all(tag_list):
-                    logger.warn("Could not find track number and name when parsing '{0}'".format(filename))
-                    continue
-                track, title = tag_list[0].text[0], music_title(tag_list[1].text[0])
-                # covers when track format is 1/1. Also left pads with 0's up to 2 characters
-                track = track.split('/')[0].zfill(2)
-
-                new_filename = "{0} {1}.mp3".format(track, title)
-                new_song_path = os.path.join(os.path.dirname(song_path), new_filename)
-
-                logger.info("Renaming song from '{0}' to '{1}'".format(filename, new_filename))
-                os.rename(song, new_song_path)
-            except:
-                logger.warn("Exception thrown when parsing '{0}'".format(filename))
-                continue
-    logger.info("Finished renaming process")
 
 def save_metadata(dir_list, genre):
 
     for album_path in sorted(dir_list):
-
         # verfiy album directory name is correct
         album_dir = os.path.basename(album_path)
         logger.info("Working in '{0}'".format(album_dir))
@@ -138,7 +89,7 @@ def save_metadata(dir_list, genre):
         artist, album, year = music_title(params.group(1).strip()), music_title(params.group(2).strip()), params.group(3).strip()
 
         # search for cover image in same directory
-        all_images = find_case_insensitve(album_path + "/*", [".jpeg", ".jpg", ".png"])
+        all_images = find_files_by_extension(album_path + "/*", [".jpeg", ".jpg", ".png"])
         if all_images:
             image_path = all_images[0]    # grab the first image we found
             image_type = image_path.split('.')[-1]  # get the file extension without dot
@@ -146,14 +97,13 @@ def save_metadata(dir_list, genre):
             logger.warn("Did not find any cover image files in '{0}'".format(album_dir))
 
         # get all MP3 files in album dir
-        mp3_list = find_case_insensitve(album_path + "/*", [".mp3"])
+        mp3_list = find_files_by_extension(album_path + "/*", [".mp3"])
         logger.info("Found {0} mp3 files".format(len(mp3_list)))
         if not mp3_list:
             logger.warn("Skipping album directory with no mp3 files '{0}'".format(album_dir))
             continue
 
         for song_path in sorted(mp3_list):
-
             # verify song file name is correct
             filename = os.path.basename(song_path)
             logger.info("Processing >>> {0}".format(filename))
@@ -162,7 +112,7 @@ def save_metadata(dir_list, genre):
                 continue
 
             # extract metadata from song name
-            filename = music_title_mp3(filename)
+            filename = music_title(filename[:-4]) + ".mp3"
             track_params = REGEX_FILENAME.search(filename)
             track_num, track_name = track_params.group(1).strip(), music_title(track_params.group(3).strip())
 
@@ -193,20 +143,24 @@ def save_metadata(dir_list, genre):
             tag.save(song_path, v2_version=3) # write the tag as ID3v2.3
             
             # Rename file
-            new_song_path = os.path.join(os.path.dirname(song_path), filename)
-            os.rename(song_path, new_song_path)
+            # new_song_path = os.path.join(os.path.dirname(song_path), filename)
+            # os.rename(song_path, new_song_path)
 
 def main():
+    """Main method responsible for parasing cl aguments and passing them to 
+
+    Args:
+        None
+    """
     # set up argument handling
     parser = argparse.ArgumentParser(description='PyD3 is a command line tool used to organize metadata of mp3 files')
     parser.add_argument('-p', metavar='path', help='Specify a path that contains one or more album directories', required=True)
     parser.add_argument('-s', help='Specifies path to be a single album directory', action='store_true')
     parser.add_argument('-g', metavar='genre', help='The genre of music for all songs in batch')
-    parser.add_argument('-r', help='Renames album directory and files if possible', action='store_true')
     args = vars(parser.parse_args())
 
     # grab arguments from command line
-    path, singleAlbumFlag, genre, renameFlag = args['p'], args['s'], args['g'], args['r']
+    path, singleAlbumFlag, genre = args['p'], args['s'], args['g']
 
     # for some reason windows grabs the path as unicode
     if isinstance(path, unicode):
@@ -216,20 +170,22 @@ def main():
         logger.error("Exiting script because '{0}' is not a directory".format(path))
         sys.exit()
 
-    path = path.rstrip('/'); # removes all trailing slashes
-    dir_list = [path] if singleAlbumFlag else [d for d in glob.glob(path + "/*") if os.path.isdir(d)] # grab paths of all folders
+    # removes all trailing slashes
+    path = path.rstrip('/');
+
+     # grab full paths of all album folders
+    dir_list = [path] if singleAlbumFlag else [d for d in glob.glob(path + "/*") if os.path.isdir(d)]
+    if len(dir_list) == 0:
+        logger.error("Did not find any directories in {0}".format(path))
+        return
 
     logger.info("PyD3 Started")
     remove_wmp_files(path)
-    if renameFlag: 
-        rename_files(dir_list)  # dir_list will be modified in this func and is no longer valid
-    else:
-        save_metadata(dir_list, genre)
+    save_metadata(dir_list, genre)
     logger.info("PyD3 Done")
 
 if __name__ == '__main__':
-    # GLOBAL VARIABLES
-    # constants
+    # constants (Global variables)
     LOG_DIR = 'log'
     LOG_FILE_NAME = 'pyd3_' + time.strftime('%Y-%m-%d_%H-%M-%S') + '.log'
     REGEX_ALBUM_DIR = re.compile("^(.+) - (.+) \(([0-9]{4})\)$", re.IGNORECASE)
